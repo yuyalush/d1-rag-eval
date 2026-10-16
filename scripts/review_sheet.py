@@ -2,6 +2,7 @@
 
     uv run python -m scripts.review_sheet export          # data/qa/test_review.csv を作る（Excel で開ける UTF-8 BOM 付き）
     uv run python -m scripts.review_sheet import          # CSV の修正を data/qa/test.jsonl に反映（元は test.orig.jsonl に退避）
+    uv run python -m scripts.review_sheet show c01926 ... # チャンクの全文と元記事の URL を表示
 
 CSV の記入方法
 - status：ok（そのまま）／fix（fixed_question・fixed_answer・fixed_evidence を反映）／drop（除外）
@@ -86,5 +87,20 @@ def import_(split: str = "test") -> None:
     print(f"反映しました: {counts}、残り {len(out)} 問（元データは {backup.name}）")
 
 
+def show(ids: list[str]) -> None:
+    """チャンクの全文と元記事の URL を表示する（レビューで evidence_text の 600 文字では足りないとき用）。"""
+    rows = {d["id"]: d for d in map(json.loads, CHUNKS.read_text(encoding="utf-8").splitlines())}
+    urls = {d["doc_id"]: d["url"] for d in map(json.loads, (ROOT / "data/raw/manifest.jsonl").read_text(encoding="utf-8").splitlines())}
+    for cid in ids:
+        if cid not in rows:
+            print(f"[{cid}] 見つかりません\n")
+            continue
+        c = rows[cid]
+        print(f"===== [{cid}] {urls.get(c['doc_id'], c['doc_id'])}\n{c['text']}\n")
+
+
 if __name__ == "__main__":
-    {"export": export, "import": import_}[sys.argv[1]]()
+    if sys.argv[1] == "show":
+        show(sys.argv[2:])
+    else:
+        {"export": export, "import": import_}[sys.argv[1]]()

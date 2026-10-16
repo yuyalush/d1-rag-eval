@@ -1,0 +1,16 @@
+# 開発用のローカル PostgreSQL（pgvector）。最終評価だけ Azure の PostgreSQL を使う。
+services:
+  pgvector:
+    image: pgvector/pgvector:0.8.0-pg16
+    environment:
+      POSTGRES_DB: ragdb
+      POSTGRES_USER: rag
+      POSTGRES_PASSWORD: rag
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+
+volumes:
+  pgdata:

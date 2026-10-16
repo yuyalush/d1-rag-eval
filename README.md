@@ -44,7 +44,31 @@ tests/
 
 ## 使用モデル
 
-T01a で確定後に `config/models.yaml` とこの節に記録します（モデル名・バージョン・リージョン・単価・確認日）。
+確認日：2026-10-16。詳細は `config/models.yaml`。単価は Azure Retail Prices API（eastus2）の USD / 100万トークン。
+
+| デプロイ | モデル | バージョン | SKU | 入力 / 出力 |
+| --- | --- | --- | --- | --- |
+| decision-eval | Microsoft-Decision-1 | 1 | DataZoneStandard | 0.042 / 0 |
+| embed | text-embedding-3-small | 1 | GlobalStandard | 0.02 / 0 |
+| gen | gpt-6-luna | 2026-09-22 | GlobalStandard | 0.10 / 0.50 |
+| judge | gpt-6-sol | 2026-09-22 | GlobalStandard | 2.00 / 10.00 |
+
+リージョン：Foundry は East US 2（Decision-1 は Japan East・Southeast Asia では未提供、GlobalStandard も未提供）、PostgreSQL は Japan East。評価ランナーが両方を呼ぶ構成のため、Foundry と DB が別リージョンでも問題ありません。
+
+## インフラ
+
+```bash
+infra/deploy.sh what-if          # 変更内容の確認
+infra/deploy.sh                  # Foundry ＋ 4 デプロイ ＋ 予算アラート（1 万円）。.env を更新
+DEPLOY_POSTGRES=true infra/deploy.sh   # 最終評価時のみ Azure の PostgreSQL も作る
+infra/destroy.sh                 # RG ごと削除し Foundry を purge
+```
+
+開発中の DB はローカルの Docker を使います。
+
+```bash
+docker compose up -d             # pgvector（db/schema.sql で初期化）
+```
 
 ## 後片付け
 

@@ -1,24 +1,43 @@
-# T01a「モデル選定の手順」で確定させる。値はすべて未確定（候補のみ）。
+# T01a「モデル選定の手順」の結果。infra/deploy.sh はこのファイルからデプロイを作る。
 # 途中でモデルを変えた場合は、その時点までの結果を比較に混ぜない。
-region: null          # 例: eastus2
-checked_at: null      # 確認日 YYYY-MM-DD
+checked_at: "2026-10-16"
+foundry_region: eastus2     # Decision-1 は japaneast / southeastasia では未提供（2026-10-16 確認）
+postgres_region: japaneast  # 評価ランナー（手元PC）から近い側に置く。Foundry とは直接通信しない
 
+# 単価は Azure Retail Prices API（eastus2）の値。USD / 100万トークン、ShortContext・Standard
 deployments:
-  decision-eval:
+  - name: decision-eval
     model: Microsoft-Decision-1
-    version: null
-    sku: GlobalStandard
-  embed:
+    format: Microsoft
+    version: "1"
+    sku: DataZoneStandard   # GlobalStandard は未提供
+    capacity: 50            # クォータ上限 60
+    price: {input: 0.042, output: 0}
+  - name: embed
     model: text-embedding-3-small
-    version: null
+    format: OpenAI
+    version: "1"
     sku: GlobalStandard
-  gen:
-    model: null       # 第一候補 gpt-6-luna、代替 gpt-5.4-mini
-    version: null
+    capacity: 200
+    price: {input: 0.02, output: 0}
+  - name: gen
+    model: gpt-6-luna
+    format: OpenAI
+    version: "2026-09-22"
     sku: GlobalStandard
+    capacity: 100
     reasoning_effort: none
-  judge:
-    model: null       # 第一候補 gpt-6-sol、代替 gpt-5.4（gen と別モデルかつ上位）
-    version: null
+    price: {input: 0.10, output: 0.50}
+  - name: judge
+    model: gpt-6-sol
+    format: OpenAI
+    version: "2026-09-22"
     sku: GlobalStandard
+    capacity: 100
     reasoning_effort: none
+    price: {input: 2.00, output: 10.00}
+    # Flex 処理（入力 1.00 / 出力 5.00）が使えれば採点費用を半分にできる。T04 で可否を確認する
+
+# 参考：不採用の候補（eastus2・GlobalStandard）
+#   gpt-5.4-mini  入力 0.75 / 出力 4.50（gen の代替）
+#   gpt-5.4       入力 2.50 / 出力 15.00（judge の代替）

@@ -22,6 +22,7 @@ class Settings:
     pg_host: str
     pg_db: str
     pg_user: str
+    pg_password: str | None  # 設定時はパスワード認証（ローカル Docker）、未設定時は Entra 認証（Azure）
 
 
 def load_settings() -> Settings:
@@ -32,9 +33,10 @@ def load_settings() -> Settings:
         embed_deployment=os.getenv("EMBED_DEPLOYMENT", "embed"),
         gen_deployment=os.getenv("GEN_DEPLOYMENT", "gen"),
         judge_deployment=os.getenv("JUDGE_DEPLOYMENT", "judge"),
-        pg_host=os.environ["PG_HOST"],
+        pg_host=os.getenv("PG_HOST", "localhost"),
         pg_db=os.getenv("PG_DB", "ragdb"),
-        pg_user=os.environ["PG_USER"],
+        pg_user=os.getenv("PG_USER", "rag"),
+        pg_password=os.getenv("PG_PASSWORD") or None,
     )
 
 

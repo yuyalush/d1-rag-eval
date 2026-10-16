@@ -28,7 +28,8 @@ def token_provider():
 @cache
 def openai_client() -> OpenAI:
     s = load_settings()
-    return OpenAI(base_url=f"{s.foundry_endpoint.rstrip('/')}/openai/v1/", api_key=token_provider(), max_retries=5)
+    # gpt-6-luna はまれに応答が返らないことがあり、既定の 600 秒では評価が止まるため 60 秒で打ち切って再試行する
+    return OpenAI(base_url=f"{s.foundry_endpoint.rstrip('/')}/openai/v1/", api_key=token_provider(), max_retries=5, timeout=60)
 
 
 def pg_connect(register: bool = True) -> psycopg.Connection:

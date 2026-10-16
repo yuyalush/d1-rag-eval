@@ -24,6 +24,7 @@ METRICS = [
     ("abstained", False),          # 回答不能での控え率（高いほど良い）
     ("abstained", True),           # 過剰拒否率（低いほど良い）
     ("latency_ms", None),
+    ("latency_api_ms", None),      # レート制限の待ちを除く
     ("cost_usd", None),
 ]
 

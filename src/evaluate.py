@@ -131,6 +131,9 @@ def summarize(out_dir: Path, split: str) -> pd.DataFrame:
                 "retrieved_recall": (len(gold & set(res["retrieved_ids"])) / len(gold)) if gold else None,
                 "abstained": res["abstained"],
                 "latency_ms": res["latency_ms"]["total"],
+                # レート制限の待ちを除いた時間：判定段を Decision-1 API の応答時間（並列の最大値）に置き換える
+                "latency_api_ms": res["latency_ms"]["total"] - res["latency_ms"]["judge"] + res["latency_ms"]["d1_api_max"]
+                if "d1_api_max" in res["latency_ms"] else res["latency_ms"]["total"],
                 "cost_usd": cost_usd(res["tokens"], p),
                 "accuracy": GRADE_POINTS.get(s["grade"]) if s else None,
                 "faithfulness": s.get("faithfulness") if s else None,
@@ -151,6 +154,7 @@ def summarize(out_dir: Path, split: str) -> pd.DataFrame:
             "abstain_answerable": ans.abstained.mean() if len(ans) else None,         # 過剰拒否率
             "latency_p50_ms": statistics.median(lat),
             "latency_p95_ms": statistics.quantiles(lat, n=20)[-1] if len(lat) >= 20 else max(lat),
+            "latency_api_p50_ms": g.latency_api_ms.median(),
             "cost_per_q_usd": g.cost_usd.mean(),
         })
 

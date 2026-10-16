@@ -11,6 +11,14 @@ from src.pipelines.base import Pipeline, PipelineResult
 from src.retriever import Hit
 
 
+def record_api_latency(result: PipelineResult, rs: list) -> None:
+    """レート制限の待ちを除いた Decision-1 の API 応答時間。並列呼び出しなので最大値が判定段の下限になる。"""
+    lat = [r.latency_ms for r in rs]
+    result.latency_ms["d1_api_max"] = result.latency_ms.get("d1_api_max", 0.0) + max(lat)
+    result.latency_ms["d1_api_sum"] = result.latency_ms.get("d1_api_sum", 0.0) + sum(lat)
+    result.decision["d1_retries"] = result.decision.get("d1_retries", 0) + sum(r.retries for r in rs)
+
+
 class ABaseline(Pipeline):
     """A：上位 5 件をそのまま生成へ。"""
 
@@ -28,6 +36,7 @@ class BD1Filter(Pipeline):
         probs = [r.answers["relevant"].probability for r in rs]
         result.decision["relevant"] = {h.id: round(p, 5) for h, p in zip(hits, probs)}
         result.tokens["d1_in"] = result.tokens.get("d1_in", 0) + sum(r.input_tokens for r in rs)
+        record_api_latency(result, rs)
         threshold = self.params["threshold"]
         kept = sorted(((p, h) for p, h in zip(probs, hits) if p >= threshold), key=lambda x: -x[0])
         return kept[: self.max_chunks]
@@ -53,6 +62,7 @@ class CD1Gate(BD1Filter):
         a = r.answers["sufficiency"]
         result.decision["sufficiency"] = {"choice": a.choice, "probabilities": {k: round(v, 5) for k, v in a.probabilities.items()}}
         result.tokens["d1_in"] = result.tokens.get("d1_in", 0) + r.input_tokens
+        record_api_latency(result, [r])
         if max(a.probabilities, key=a.probabilities.get) == self.params["abstain_on"]:
             result.gated = True
         return passed
@@ -69,6 +79,7 @@ class DD1Rerank(Pipeline):
         scores = [r.answers["usefulness"].score for r in rs]
         result.decision["usefulness"] = {h.id: round(s, 5) for h, s in zip(hits, scores)}
         result.tokens["d1_in"] = sum(r.input_tokens for r in rs)
+        record_api_latency(result, rs)
         ranked = sorted(zip(scores, range(len(hits)), hits), key=lambda x: (-x[0], x[1]))
         return [h for _, _, h in ranked[: self.max_chunks]]
 

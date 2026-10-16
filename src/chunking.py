@@ -32,6 +32,11 @@ def n_tokens(text: str) -> int:
     return len(enc.encode(text))
 
 
+def decode_clean(ids: list[int]) -> str:
+    """トークン列を文字列に戻す。トークン境界で日本語の文字が途中で切れた場合、壊れた端の文字（U+FFFD）を落とす。"""
+    return enc.decode(ids).strip("\ufffd")
+
+
 @dataclass
 class Chunk:
     id: str
@@ -99,11 +104,11 @@ def split_long(text: str, budget: int) -> list[str]:
                 cur, cur_tok = [], 0
             ids = enc.encode(p)
             step = budget - OVERLAP_TOKENS
-            pieces.extend(enc.decode(ids[i : i + budget]) for i in range(0, len(ids), step))
+            pieces.extend(decode_clean(ids[i : i + budget]) for i in range(0, len(ids), step))
             continue
         if cur and cur_tok + pt > budget:
             pieces.append("\n\n".join(cur))
-            tail = enc.decode(enc.encode(pieces[-1])[-OVERLAP_TOKENS:])
+            tail = decode_clean(enc.encode(pieces[-1])[-OVERLAP_TOKENS:])
             cur, cur_tok = [tail], OVERLAP_TOKENS
         cur.append(p)
         cur_tok += pt

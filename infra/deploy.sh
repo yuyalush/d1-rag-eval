@@ -6,6 +6,7 @@
 #   RG=rg-d1rag-eval  RG_LOCATION=japaneast  DEPLOY_POSTGRES=false  BUDGET_AMOUNT=10000
 set -euo pipefail
 cd "$(dirname "$0")/.."
+[[ -f .env ]] || cp .env.example .env
 
 MODE=${1:-create}
 RG=${RG:-rg-d1rag-eval}

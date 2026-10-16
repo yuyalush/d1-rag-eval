@@ -38,10 +38,11 @@ def write_params(out: str, extra: list[str]) -> None:
 
 
 def write_env(outputs_file: str) -> None:
-    outputs = json.loads(Path(outputs_file).read_text(encoding="utf-8-sig"))
-    updates = {"FOUNDRY_ENDPOINT": outputs["FOUNDRY_ENDPOINT"]["value"]}
-    if outputs["PG_HOST"]["value"]:
-        updates["PG_HOST"] = outputs["PG_HOST"]["value"]
+    raw = json.loads(Path(outputs_file).read_text(encoding="utf-8-sig"))
+    outputs = {k.lower(): v["value"] for k, v in raw.items()}
+    updates = {"FOUNDRY_ENDPOINT": outputs["foundryendpoint"]}
+    if outputs.get("pghost"):
+        updates["PG_HOST"] = outputs["pghost"]
 
     env_path = ROOT / ".env"
     if not env_path.exists():

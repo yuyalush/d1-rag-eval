@@ -209,7 +209,8 @@ resource budget 'Microsoft.Consumption/budgets@2023-11-01' = {
   }
 }
 
-output FOUNDRY_ENDPOINT string = 'https://${foundry.properties.customSubDomainName}.services.ai.azure.com'
-output FOUNDRY_ACCOUNT string = foundry.name
-output PG_HOST string = deployPostgres ? pg!.properties.fullyQualifiedDomainName : ''
-output PG_SERVER string = deployPostgres ? pg.name : ''
+// Azure CLI は出力名を camelCase に書き換える（FOUNDRY_ENDPOINT → foundrY_ENDPOINT）ため camelCase で定義する
+output foundryEndpoint string = 'https://${foundry.properties.customSubDomainName}.services.ai.azure.com'
+output foundryAccount string = foundry.name
+output pgHost string = deployPostgres ? pg!.properties.fullyQualifiedDomainName : ''
+output pgServer string = deployPostgres ? pg.name : ''

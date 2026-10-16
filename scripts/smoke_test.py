@@ -13,19 +13,13 @@ import time
 from collections.abc import Callable
 
 import httpx
-import psycopg
 import yaml
-from azure.identity import DefaultAzureCredential, get_bearer_token_provider
-from openai import OpenAI
 
+from src.clients import openai_client, pg_connect, token_provider
 from src.config import ROOT, load_settings
 
-SCOPE = "https://cognitiveservices.azure.com/.default"
-
 settings = load_settings()
-credential = DefaultAzureCredential()
-token_provider = get_bearer_token_provider(credential, SCOPE)
-client = OpenAI(base_url=f"{settings.foundry_endpoint.rstrip('/')}/openai/v1/", api_key=token_provider)
+client = openai_client()
 
 models = yaml.safe_load((ROOT / "config/models.yaml").read_text(encoding="utf-8"))
 prices = {d["name"]: d["price"] for d in models["deployments"]}
@@ -57,7 +51,7 @@ def check_decision() -> str:
     r = httpx.post(
         f"{settings.foundry_endpoint.rstrip('/')}/providers/microsoft/v1/systemone",
         json=body,
-        headers={"Authorization": f"Bearer {token_provider()}"},
+        headers={"Authorization": f"Bearer {token_provider()()}"},
         timeout=60,
     )
     r.raise_for_status()
@@ -90,15 +84,7 @@ def check_chat(deployment_key: str, deployment: str) -> str:
 
 
 def check_postgres() -> str:
-    password = settings.pg_password or credential.get_token("https://ossrdbms-aad.database.windows.net/.default").token
-    with psycopg.connect(
-        host=settings.pg_host,
-        dbname=settings.pg_db,
-        user=settings.pg_user,
-        password=password,
-        sslmode="disable" if settings.pg_host == "localhost" else "require",
-        connect_timeout=10,
-    ) as conn:
+    with pg_connect(register=False) as conn:
         version = conn.execute("SELECT extversion FROM pg_extension WHERE extname = 'vector'").fetchone()
         count = conn.execute("SELECT count(*) FROM chunks").fetchone()
     return f"host={settings.pg_host} pgvector={version[0] if version else None} chunks={count[0]}"

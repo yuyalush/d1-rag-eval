@@ -36,7 +36,9 @@ deployments:
     capacity: 100
     reasoning_effort: none
     price: {input: 2.00, output: 10.00}
-    # Flex 処理（入力 1.00 / 出力 5.00）が使えれば採点費用を半分にできる。T04 で可否を確認する
+    # Flex 処理（入力 1.00 / 出力 5.00）が使える（T04 で確認、service_tier="flex"）。
+    # 即時性の要らない QA 生成と採点は Flex で呼ぶ
+    flex_price: {input: 1.00, output: 5.00}
 
 # 参考：不採用の候補（eastus2・GlobalStandard）
 #   gpt-5.4-mini  入力 0.75 / 出力 4.50（gen の代替）

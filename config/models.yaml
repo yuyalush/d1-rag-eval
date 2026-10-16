@@ -1,0 +1,24 @@
+# T01a「モデル選定の手順」で確定させる。値はすべて未確定（候補のみ）。
+# 途中でモデルを変えた場合は、その時点までの結果を比較に混ぜない。
+region: null          # 例: eastus2
+checked_at: null      # 確認日 YYYY-MM-DD
+
+deployments:
+  decision-eval:
+    model: Microsoft-Decision-1
+    version: null
+    sku: GlobalStandard
+  embed:
+    model: text-embedding-3-small
+    version: null
+    sku: GlobalStandard
+  gen:
+    model: null       # 第一候補 gpt-6-luna、代替 gpt-5.4-mini
+    version: null
+    sku: GlobalStandard
+    reasoning_effort: none
+  judge:
+    model: null       # 第一候補 gpt-6-sol、代替 gpt-5.4（gen と別モデルかつ上位）
+    version: null
+    sku: GlobalStandard
+    reasoning_effort: none

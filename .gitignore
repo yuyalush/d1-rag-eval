@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+
+# 環境変数・秘密情報
+.env
+
+# データと実行結果（サイズが大きいため追跡しない。.gitkeep のみ残す）
+data/raw/*
+!data/raw/.gitkeep
+data/chunks.jsonl
+results/*
+!results/.gitkeep
+
+# エディタ・OS
+.vscode/
+.idea/
+.DS_Store

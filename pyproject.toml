@@ -1,0 +1,29 @@
+[project]
+name = "d1-rag-eval"
+version = "0.1.0"
+description = "Microsoft-Decision-1 を RAG に組み込んだ場合の効果を検証する評価リポジトリ"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "azure-identity>=1.19",
+    "openai>=1.60",
+    "psycopg[binary]>=3.2",
+    "pgvector>=0.3",
+    "httpx>=0.27",
+    "pandas>=2.2",
+    "pyyaml>=6.0",
+    "tiktoken>=0.8",
+    "python-dotenv>=1.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

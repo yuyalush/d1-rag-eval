@@ -1,0 +1,20 @@
+# 構成ごとの検索件数・閾値・判定設定（値は T15 の閾値チューニングで更新する）
+common:
+  max_context_chunks: 5
+  temperature: 0
+  decision_concurrency: 4
+
+configs:
+  a_baseline:
+    retrieve_k: 5
+  b_d1_filter:
+    retrieve_k: 10
+    threshold: 0.5
+  c_d1_gate:
+    retrieve_k: 10
+    threshold: 0.5
+    abstain_on: insufficient
+  d_d1_rerank:
+    retrieve_k: 20
+  e_llm_filter:
+    retrieve_k: 10

@@ -15,6 +15,7 @@ dependencies = [
     "tiktoken>=0.8",
     "python-dotenv>=1.0",
     "numpy>=2.4.6",
+    "tabulate>=0.10.0",
 ]
 
 [dependency-groups]

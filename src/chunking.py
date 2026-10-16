@@ -157,7 +157,7 @@ def select_documents(target: int) -> list[str]:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--target-chunks", type=int, default=3000, help="0 で全文書を使う")
+    parser.add_argument("--target-chunks", type=int, default=0, help="0（既定）で全文書を使う。正の値で目次順にサービス比率を保って絞る")
     args = parser.parse_args()
 
     files = [RAW_DIR / f"{d}.md" for d in select_documents(args.target_chunks)]

@@ -2,6 +2,7 @@
 common:
   max_context_chunks: 5
   decision_concurrency: 4
+  decision_rpm: 55            # Decision-1 のデプロイ上限（60 リクエスト/分）より少し下に抑える
   llm_filter_concurrency: 4
 
 configs:

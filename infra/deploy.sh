@@ -7,6 +7,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 [[ -f .env ]] || cp .env.example .env
+# Linux 版 Bicep（.NET）は libicu がないと起動しないため、国際化機能なしで動かす
+export DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1
 
 MODE=${1:-create}
 RG=${RG:-rg-d1rag-eval}

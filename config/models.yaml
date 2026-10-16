@@ -11,7 +11,7 @@ deployments:
     format: Microsoft
     version: "1"
     sku: DataZoneStandard   # GlobalStandard は未提供
-    capacity: 50            # クォータ上限 60
+    capacity: 60            # = 1 分あたり 60 リクエスト（クォータ上限）。トークン数ではなくリクエスト数で制限される
     price: {input: 0.042, output: 0}
   - name: embed
     model: text-embedding-3-small

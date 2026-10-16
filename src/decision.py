@@ -110,13 +110,33 @@ def parse_response(payload: dict[str, Any], latency_ms: float = 0.0, retries: in
 
 # ---- クライアント ------------------------------------------------------------
 
+class RateLimiter:
+    """リクエストの開始間隔を 60/rpm 秒以上に保つ（デプロイの上限は 1 分あたりのリクエスト数）。"""
+
+    def __init__(self, rpm: float) -> None:
+        self.interval = 60.0 / rpm
+        self.next_at = 0.0
+        self.lock = asyncio.Lock()
+        self.waited_s = 0.0
+
+    async def wait(self) -> None:
+        async with self.lock:
+            now = time.monotonic()
+            delay = self.next_at - now
+            self.next_at = max(now, self.next_at) + self.interval
+        if delay > 0:
+            self.waited_s += delay
+            await asyncio.sleep(delay)
+
+
 class DecisionClient:
-    def __init__(self, concurrency: int = 4, max_retries: int = 6, timeout: float = 60.0) -> None:
+    def __init__(self, concurrency: int = 4, max_retries: int = 8, timeout: float = 60.0, rpm: float | None = 55) -> None:
         s = load_settings()
         self.url = f"{s.foundry_endpoint.rstrip('/')}/providers/microsoft/v1/systemone"
         self.deployment = s.decision_deployment
         self.max_retries = max_retries
         self.semaphore = asyncio.Semaphore(concurrency)
+        self.limiter = RateLimiter(rpm) if rpm else None
         self.http = httpx.AsyncClient(timeout=timeout)
         self.get_token = token_provider()
 
@@ -124,6 +144,8 @@ class DecisionClient:
         body = {"model": self.deployment, "state": state, "questions": questions}
         async with self.semaphore:
             for attempt in range(self.max_retries + 1):
+                if self.limiter:
+                    await self.limiter.wait()
                 start = time.perf_counter()
                 try:
                     r = await self.http.post(self.url, json=body, headers={"Authorization": f"Bearer {self.get_token()}"})
@@ -140,7 +162,7 @@ class DecisionClient:
                     if attempt == self.max_retries:
                         raise DecisionError(f"gave up after {attempt + 1} attempts: {e}") from e
                     retry_after = getattr(e, "retry_after", None)
-                    delay = float(retry_after) if retry_after else min(2**attempt, 30) + random.random()
+                    delay = float(retry_after) if retry_after else min(2**attempt, 60) + random.random()
                     await asyncio.sleep(delay)
         raise AssertionError("unreachable")
 

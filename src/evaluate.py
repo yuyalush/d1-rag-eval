@@ -27,6 +27,7 @@ from src.pipelines.configs import PIPELINES
 from src.retriever import Retriever
 
 RESULTS = ROOT / "results"
+GRADE_POINTS = {"correct": 1.0, "partial": 0.5, "wrong": 0.0}
 
 
 def load_qa(split: str) -> list[dict]:
@@ -50,7 +51,7 @@ async def run_all(split: str, configs: list[str], runs: int, run_id: str, limit:
     qa = load_qa(split)[:limit]
     out_dir = RESULTS / run_id
     retriever, generator = Retriever(), Generator()
-    decision = DecisionClient(concurrency=load_config()["common"]["decision_concurrency"])
+    decision = DecisionClient(concurrency=load_config()["common"]["decision_concurrency"], rpm=load_config()["common"]["decision_rpm"])
     # デプロイ直後や間隔が空いた後の初回応答は遅いため、計測前に 1 回ずつ呼んでおく
     generator.generate("ウォームアップ", [])
     await PIPELINES["b_d1_filter"](retriever, generator, decision).run("Blob のアクセス層は？")
@@ -92,7 +93,7 @@ def d1_auc(out_dir: Path, qa: dict[str, dict]) -> dict[str, float | None]:
     out: dict[str, float | None] = {}
     for name, key in (("b_d1_filter", "relevant"), ("c_d1_gate", "relevant"), ("d_d1_rerank", "usefulness")):
         labels, scores = [], []
-        for log in out_dir.glob(f"{name}__r*.jsonl"):
+        for log in out_dir.glob(f"{name}__r*.jsonl"):  # scores__ で始まるファイルはこのパターンに一致しない
             for line in log.read_text(encoding="utf-8").splitlines():
                 res = json.loads(line)
                 gold = set(qa[res["qid"]]["evidence_chunk_ids"])
@@ -111,10 +112,15 @@ def summarize(out_dir: Path, split: str) -> pd.DataFrame:
     p = prices()
     rows = []
     for log in sorted(out_dir.glob("*__r*.jsonl")):
+        if log.name.startswith("scores__"):
+            continue
         name, run = log.stem.split("__r")
+        score_file = out_dir / f"scores__{log.name}"
+        scores = {s["qid"]: s for s in map(json.loads, score_file.read_text(encoding="utf-8").splitlines())} if score_file.exists() else {}
         for line in log.read_text(encoding="utf-8").splitlines():
             res = json.loads(line)
             q = qa[res["qid"]]
+            s = scores.get(res["qid"], {})
             gold = set(q["evidence_chunk_ids"])
             passed = res["passed_ids"]
             rows.append({
@@ -126,6 +132,8 @@ def summarize(out_dir: Path, split: str) -> pd.DataFrame:
                 "abstained": res["abstained"],
                 "latency_ms": res["latency_ms"]["total"],
                 "cost_usd": cost_usd(res["tokens"], p),
+                "accuracy": GRADE_POINTS.get(s["grade"]) if s else None,
+                "faithfulness": s.get("faithfulness") if s else None,
             })
     df = pd.DataFrame(rows)
 
@@ -134,6 +142,8 @@ def summarize(out_dir: Path, split: str) -> pd.DataFrame:
         lat = g.latency_ms.tolist()
         return pd.Series({
             "n": len(g),
+            "accuracy": g.accuracy.mean(),          # LLM 採点（correct=1, partial=0.5）。未採点なら NaN
+            "faithfulness": g.faithfulness.mean(),
             "context_precision": ans.precision.mean(),
             "context_recall": ans.recall.mean(),
             "retrieved_recall": ans.retrieved_recall.mean(),

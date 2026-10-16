@@ -10,10 +10,10 @@ configs:
     retrieve_k: 5
   b_d1_filter:
     retrieve_k: 10
-    threshold: 0.5
+    threshold: 0.8             # T15：開発用セットで 0.3〜0.8 を比較し、Recall を保ったまま Precision が最も高い値
   c_d1_gate:
     retrieve_k: 10
-    threshold: 0.5
+    threshold: 0.8
     abstain_on: insufficient   # この選択肢の確率が最大なら回答を控える
   d_d1_rerank:
     retrieve_k: 20
@@ -22,12 +22,12 @@ configs:
 
 # Decision-1 の質問文（state は {"question": ..., "passage(s)": ...}）
 decision_questions:
-  relevant:
+  relevant:                    # T15 で en_partial を採用（AUC 0.89、Recall 0.716 / Precision 0.420 @0.8）
     type: noul
-    instructions: Does the passage contain information needed to answer the question?
+    instructions: Would this passage help answer the question, even partially?
     criteria:
-      "true": The passage states facts that directly answer all or part of the question
-      "false": The passage is off-topic or only shares keywords with the question
+      "true": The passage contains at least one fact needed for the answer
+      "false": The passage does not contain any fact needed for the answer
   sufficiency:
     type: choice
     instructions: Do the passages together contain enough evidence to answer the question?

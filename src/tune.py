@@ -27,7 +27,11 @@ THRESHOLDS = [0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
 MAX_CHUNKS = 5
 
 RELEVANT_VARIANTS = {
-    "en_base": load_config()["decision_questions"]["relevant"],
+    "en_base": noul(
+        "Does the passage contain information needed to answer the question?",
+        "The passage states facts that directly answer all or part of the question",
+        "The passage is off-topic or only shares keywords with the question",
+    ),
     "en_partial": noul(
         "Would this passage help answer the question, even partially?",
         "The passage contains at least one fact needed for the answer",
@@ -121,8 +125,10 @@ async def main_async() -> None:
                 "unanswerable_no_context": round(empty_unans / n_unans, 4),  # 回答不能で 1 件も通さなかった割合
             })
     df_b = pd.DataFrame(rows_b)
-    # 最良：Context Recall を優先し、同点なら Context Precision が高いもの
-    best_b = df_b.sort_values(["context_recall", "context_precision", "chunk_f1"], ascending=False).iloc[0]
+    # 最良：Context Recall が最大値から 0.02 以内の設定のうち、Context Precision が最も高いもの
+    # （Recall は閾値でほとんど変わらず Precision だけが上がるため、Recall 最大だけで選ぶと低い閾値に偏る）
+    near_best = df_b[df_b.context_recall >= df_b.context_recall.max() - 0.02]
+    best_b = near_best.sort_values(["context_precision", "chunk_f1"], ascending=False).iloc[0]
     print("構成 B（relevant）:\n", df_b.to_string(index=False), "\n最良:", dict(best_b))
 
     # ---- C：sufficiency（B の最良設定で通過したチャンクに対して） ----

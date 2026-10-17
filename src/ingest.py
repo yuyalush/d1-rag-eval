@@ -29,6 +29,9 @@ def md5(text: str) -> str:
 def main() -> None:
     settings = load_settings()
     chunks = [json.loads(line) for line in CHUNKS.read_text(encoding="utf-8").splitlines()]
+    broken = [c["id"] for c in chunks if "�" in c["text"]]
+    if broken:
+        raise SystemExit(f"壊れた文字（U+FFFD）を含むチャンクが {len(broken)} 件あります: {broken[:10]}。src.chunking を再実行してください")
 
     with pg_connect(register=False) as conn:
         conn.execute((ROOT / "db/schema.sql").read_text(encoding="utf-8"))

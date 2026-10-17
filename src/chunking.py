@@ -32,9 +32,22 @@ def n_tokens(text: str) -> int:
     return len(enc.encode(text))
 
 
+REPLACEMENT_CHAR = "\ufffd"
+
+
 def decode_clean(ids: list[int]) -> str:
-    """トークン列を文字列に戻す。トークン境界で日本語の文字が途中で切れた場合、壊れた端の文字（U+FFFD）を落とす。"""
-    return enc.decode(ids).strip("\ufffd")
+    """トークン列を文字列に戻す。
+
+    cl100k_base では日本語の 1 文字が複数トークンに分かれることがあり、トークン単位で切り出すと
+    両端の文字が途中で切れて U+FFFD になる。両端の壊れた文字だけを落とす。
+    落とした文字は、重なりで隣のチャンクにそのまま含まれるので内容は失われない。
+    """
+    return enc.decode(ids).strip(REPLACEMENT_CHAR)
+
+
+def find_broken(chunks: list["Chunk"]) -> list[str]:
+    """U+FFFD を含むチャンクの ID（元の Markdown には含まれないので、あれば分割処理の不具合）。"""
+    return [c.id for c in chunks if REPLACEMENT_CHAR in c.text]
 
 
 @dataclass
@@ -169,6 +182,9 @@ def main() -> None:
     all_chunks: list[Chunk] = []
     for f in files:
         all_chunks.extend(chunk_document(f.stem, f.read_text(encoding="utf-8"), len(all_chunks)))
+    broken = find_broken(all_chunks)
+    if broken:
+        raise SystemExit(f"壊れた文字（U+FFFD）を含むチャンクが {len(broken)} 件あります: {broken[:10]}。chunks.jsonl は更新しません")
     with OUT.open("w", encoding="utf-8") as out:
         for c in all_chunks:
             out.write(json.dumps(asdict(c), ensure_ascii=False) + "\n")

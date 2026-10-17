@@ -48,11 +48,12 @@ def export(split: str = "test") -> None:
     print(f"{out} に {len(rows)} 問を書き出しました")
 
 
-def import_(split: str = "test") -> None:
+def import_(split: str = "test", reviews: list[dict] | None = None) -> None:
     src = QA / f"{split}.jsonl"
     rows = {r["qid"]: r for r in map(json.loads, src.read_text(encoding="utf-8").splitlines())}
-    with (QA / f"{split}_review.csv").open(encoding="utf-8-sig", newline="") as f:
-        reviews = list(csv.DictReader(f))
+    if reviews is None:
+        with (QA / f"{split}_review.csv").open(encoding="utf-8-sig", newline="") as f:
+            reviews = list(csv.DictReader(f))
     missing = [r["qid"] for r in reviews if r["status"].strip() not in ("ok", "fix", "drop")]
     if missing:
         sys.exit(f"status が未記入または不正な行があります: {missing[:10]}{' ...' if len(missing) > 10 else ''}")

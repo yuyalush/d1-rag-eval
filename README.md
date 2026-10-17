@@ -73,3 +73,16 @@ docker compose up -d             # pgvector（db/schema.sql で初期化）
 ## 後片付け
 
 検証後は `infra/destroy.sh` でリソースグループごと削除し、予算アラートが消えたことを確認してください。
+
+## 質問セットのレビュー（T08）
+
+テスト用セットは、AI の一次レビュー（`data/qa/test_ai_review.jsonl`）を初期値にして、ターミナルで 1 問ずつ確認します。
+
+```bash
+uv run python -m scripts.review_cli                # 未判定の質問から順にレビュー（? でコマンド一覧）
+uv run python -m scripts.review_cli --only ai-fix  # AI が fix / drop を提案した質問だけ
+uv run python -m scripts.review_cli status         # 進捗
+uv run python -m scripts.review_cli apply          # 判定を data/qa/test.jsonl に反映（元データは test.orig.jsonl）
+```
+
+判定は `data/qa/test_human_review.jsonl` に都度保存されるので、途中で終了しても再開できます。

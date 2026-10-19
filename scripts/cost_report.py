@@ -18,9 +18,11 @@
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 import json
 import re
 import subprocess
+import time
 from collections import defaultdict
 from pathlib import Path
 
@@ -43,8 +45,9 @@ DEPLOYMENTS = [
     (r"(?i)phi", "gen-phi"),
 ]
 # メーター名の略語 → トークンの種類（入力側か出力側か）
-KINDS = [(r"Cd Wr", "キャッシュ書き込み", "in"), (r"Cd Inp", "キャッシュ読み取り", "in"),
-         (r"Opt|Output|Outp", "出力", "out"), (r"Inp|Input|Tokens", "入力", "in")]
+# 表記はモデルごとに違う（gpt-6：Cd Wr / Cd Inp / Inp / Opt、gpt-5-nano：cchd Inpt / Inpt / outpt、Phi：Input / Output）
+KINDS = [(r"(?i)Cd Wr", "キャッシュ書き込み", "in"), (r"(?i)Cd Inp|cchd", "キャッシュ読み取り", "in"),
+         (r"(?i)Opt|Outp", "出力", "out"), (r"(?i)Inp|Tokens", "入力", "in")]
 
 
 def deployment_of(meter: str) -> str:
@@ -52,7 +55,7 @@ def deployment_of(meter: str) -> str:
 
 
 def kind_of(meter: str) -> tuple[str, str]:
-    label, side = next(((k, s) for pat, k, s in KINDS if re.search(pat, meter)), ("トークン", "in"))
+    label, side = next(((k, s) for pat, k, s in KINDS if re.search(pat, meter)), ("トークン", "in"))  # noqa: B023
     return label + ("（Flex）" if "Flex" in meter else ""), side
 
 
@@ -79,7 +82,14 @@ def query_cost(sub: str, rg: str, start: str, end: str) -> list[dict]:
     }
     url, rows = COST_API.format(sub=sub), []
     while url:
-        r = httpx.post(url, json=body, headers=headers(), timeout=60)
+        for _ in range(6):  # Cost Management API は数回 / 分で 429 を返す。指示された秒数だけ待って再試行する
+            r = httpx.post(url, json=body, headers=headers(), timeout=60)
+            if r.status_code != 429:
+                break
+            wait = max(int(v) for k, v in r.headers.items() if k.lower().endswith("retry-after") and v.isdigit()) \
+                if any(k.lower().endswith("retry-after") for k in r.headers) else 60
+            print(f"Cost Management API が 429 を返したので {wait} 秒待ちます")
+            time.sleep(wait)
         r.raise_for_status()
         p = r.json()["properties"]
         cols = [c["name"] for c in p["columns"]]
@@ -89,19 +99,23 @@ def query_cost(sub: str, rg: str, start: str, end: str) -> list[dict]:
 
 
 def query_metrics(resource_id: str, start: str, end: str) -> dict[tuple[str, str], list[float]]:
-    """(デプロイ名, YYYYMMDD) → [入力トークン, 出力トークン]"""
+    """(デプロイ名, YYYYMMDD) → [入力トークン, 出力トークン, FoundryModelEstimatedCost（USD）, その記録件数]"""
     r = httpx.get(f"{MGMT}{resource_id}/providers/Microsoft.Insights/metrics", headers=headers(), timeout=60, params={
-        "api-version": "2023-10-01", "metricnames": "InputTokens,OutputTokens", "aggregation": "Total", "interval": "P1D",
+        "api-version": "2023-10-01", "metricnames": "InputTokens,OutputTokens,FoundryModelEstimatedCost",
+        "aggregation": "Total,Count", "interval": "P1D",
         "timespan": f"{start}T00:00:00Z/{end}T23:59:59Z", "$filter": "ModelDeploymentName eq '*'"})
     r.raise_for_status()
-    out = defaultdict(lambda: [0.0, 0.0])
+    out = defaultdict(lambda: [0.0, 0.0, 0.0, 0.0])
     for m in r.json()["value"]:
-        side = 0 if m["name"]["value"] == "InputTokens" else 1
+        side = {"InputTokens": 0, "OutputTokens": 1, "FoundryModelEstimatedCost": 2}[m["name"]["value"]]
         for ts in m["timeseries"]:
             dep = next(v["value"] for v in ts["metadatavalues"] if v["name"]["value"].lower() == "modeldeploymentname")
             for p in ts["data"]:
                 if p.get("total"):
-                    out[(dep, p["timeStamp"][:10].replace("-", ""))][side] += p["total"]
+                    key = (dep, p["timeStamp"][:10].replace("-", ""))
+                    out[key][side] += p["total"]
+                    if side == 2:
+                        out[key][3] += p.get("count") or 0
     return out
 
 
@@ -118,9 +132,13 @@ def main() -> None:
     account_id = az("cognitiveservices", "account", "list", "-g", args.resource_group, "--subscription", sub, "--query", "[0].id")
     rows = query_cost(sub, args.resource_group, args.start, args.end)
     metrics = query_metrics(account_id, args.start, args.end)
-    (ROOT / "results").mkdir(exist_ok=True)
-    (ROOT / "results/azure_cost.json").write_text(json.dumps(
-        {"cost": rows, "metrics": {f"{k[0]}|{k[1]}": v for k, v in metrics.items()}}, ensure_ascii=False, indent=1), encoding="utf-8")
+    # 確定額の反映の遅れを後から追えるよう、取得時刻ごとのスナップショットも残す
+    now = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%MZ")
+    raw = json.dumps({"fetched_at": now, "cost": rows, "metrics": {f"{k[0]}|{k[1]}": v for k, v in metrics.items()}},
+                     ensure_ascii=False, indent=1)
+    (ROOT / "results/cost_snapshots").mkdir(parents=True, exist_ok=True)
+    (ROOT / "results/azure_cost.json").write_text(raw, encoding="utf-8")
+    (ROOT / f"results/cost_snapshots/{now}.json").write_text(raw, encoding="utf-8")
 
     cur = rows[0]["Currency"] if rows else "JPY"
     models = {d["name"]: d for d in yaml.safe_load((ROOT / "config/models.yaml").read_text(encoding="utf-8"))["deployments"]}
@@ -158,7 +176,7 @@ def main() -> None:
     keys = sorted(set(metrics) | set(billed))
     table, totals = [], defaultdict(float)
     for dep, day in keys:
-        mi, mo = metrics.get((dep, day), [0.0, 0.0])
+        mi, mo = metrics.get((dep, day), [0.0, 0.0, 0.0, 0.0])[:2]
         b = billed.get((dep, day), {"in": 0.0, "out": 0.0, "in_cost": 0.0, "out_cost": 0.0})
         cost = b["in_cost"] + b["out_cost"]
         est = 0.0
@@ -185,6 +203,25 @@ def main() -> None:
              "| --- | --- | --- | --- | --- | --- |"]
     for dep, day, mi, mo, cost, est in table:
         lines.append(f"| {fd(day)} | {dep} | {mi:,.0f} | {mo:,.0f} | {cost:,.1f} | {est:,.1f} |")
+    lines += ["", "## 3 つの方法の比較（確定額が出ている日）", "",
+              "同じ日・同じデプロイで、(1) メトリックのトークン数 × 一覧単価（リアルタイム推定）、(2) 確定額、"
+              "(3) FoundryModelEstimatedCost × 為替を並べた。トークン数の差は、メトリックと請求で数えたトークン数の差。"
+              "確定額が一部しか出ていない日は (2) が小さく出る。", "",
+              f"| 日付 | デプロイ | トークン数の差（請求 − メトリック） | (1) 一覧単価での推定 | (2) 確定額 | (1) との差 | "
+              f"(3) 公式の推定費用（記録件数） | (3) / (2) |", "| --- | --- | --- | --- | --- | --- | --- | --- |"]
+    for dep, day, mi, mo, cost, est in table:
+        if not cost:
+            continue
+        b = billed[(dep, day)]
+        li, lo = list_unit(dep, "in") or 0.0, list_unit(dep, "out") or 0.0
+        if dep == "decision-eval":
+            lo = 0.0
+        list_est = mi * li + mo * lo
+        _, _, fcost, fcount = metrics.get((dep, day), [0.0, 0.0, 0.0, 0.0])
+        f_jpy = fcost * fx if fx else 0.0
+        lines.append(f"| {fd(day)} | {dep} | {b['in'] + b['out'] - mi - mo:+,.0f} | {list_est:,.2f} | {cost:,.2f} | "
+                     f"{(cost / list_est - 1) * 100 if list_est else 0:+.1f}% | {f_jpy:,.3f}（{fcount:.0f}） | "
+                     f"{f_jpy / cost if cost else 0:.3f} |")
     lines += ["", "## 確定分の実効単価", "",
               f"キャッシュ書き込みなど一覧単価にない料金を含めた、実際の 100 万トークンあたりの金額（{cur}）。", "",
               f"| デプロイ | 入力 | 出力 | 一覧単価での入力 | 一覧単価での出力 |", "| --- | --- | --- | --- | --- |"]

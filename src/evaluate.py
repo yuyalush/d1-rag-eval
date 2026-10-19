@@ -39,11 +39,12 @@ def prices() -> dict[str, dict[str, float]]:
     return {d["name"]: d["price"] for d in models["deployments"]}
 
 
-def cost_usd(tokens: dict[str, int], p: dict[str, dict[str, float]]) -> float:
+def cost_usd(tokens: dict[str, int], p: dict[str, dict[str, float]], gen: str = "gen") -> float:
+    """1 回答の費用。回答の生成は gen（差し替え比較では gen-nano など）、構成 E の判定は常に gen の単価。"""
     usd = tokens.get("embed", 0) * p["embed"]["input"]
     usd += tokens.get("d1_in", 0) * p["decision-eval"]["input"]
-    usd += (tokens.get("gen_in", 0) + tokens.get("filter_in", 0)) * p["gen"]["input"]
-    usd += (tokens.get("gen_out", 0) + tokens.get("filter_out", 0)) * p["gen"]["output"]
+    usd += tokens.get("gen_in", 0) * p[gen]["input"] + tokens.get("gen_out", 0) * p[gen]["output"]
+    usd += tokens.get("filter_in", 0) * p["gen"]["input"] + tokens.get("filter_out", 0) * p["gen"]["output"]
     return usd / 1e6
 
 
@@ -139,7 +140,7 @@ def summarize(out_dir: Path, split: str) -> pd.DataFrame:
                 "latency_ms": res["latency_ms"]["total"],
                 # レート制限の待ちを除いた時間：判定段を Decision-1 API の応答時間（並列の最大値）に置き換える
                 "latency_api_ms": api_latency(res["latency_ms"]),
-                "cost_usd": cost_usd(res["tokens"], p),
+                "cost_usd": cost_usd(res["tokens"], p, res.get("gen_deployment", "gen")),
                 "accuracy": GRADE_POINTS.get(s["grade"]) if s else None,
                 "faithfulness": s.get("faithfulness") if s else None,
             })

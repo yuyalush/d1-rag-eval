@@ -5,8 +5,10 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 
+import yaml
+
 from src.clients import openai_client
-from src.config import load_settings
+from src.config import ROOT, load_settings
 
 UNKNOWN = "わかりません"
 
@@ -37,23 +39,39 @@ def build_user_prompt(question: str, passages: list[str]) -> str:
     return f"# 参考情報\n{context}\n\n# 質問\n{question}"
 
 
+def model_params(deployment: str, max_tokens: int) -> dict:
+    """config/models.yaml の設定から、モデルごとに呼び出しのパラメーターを決める。
+
+    - gpt-6 系（gen）：temperature=0、reasoning_effort=none
+    - gpt-5 系（gen-nano）：推論モデルは temperature を指定できない。推論トークンも上限に含まれるので上限を広げる
+    - Phi などの非推論モデル（gen-phi）：temperature=0、max_tokens
+    """
+    models = yaml.safe_load((ROOT / "config/models.yaml").read_text(encoding="utf-8"))
+    d = next((m for m in models["deployments"] if m["name"] == deployment), {})
+    effort = d.get("reasoning_effort")
+    if d.get("format", "OpenAI") != "OpenAI":
+        return {"temperature": 0, "max_tokens": max_tokens}
+    if str(d.get("model", "")).startswith("gpt-5"):
+        return {"reasoning_effort": effort or "minimal", "max_completion_tokens": max_tokens * 3}
+    return {"temperature": 0, "reasoning_effort": effort or "none", "max_completion_tokens": max_tokens}
+
+
 class Generator:
-    def __init__(self, max_tokens: int = 800) -> None:
+    def __init__(self, max_tokens: int = 800, deployment: str | None = None) -> None:
         self.settings = load_settings()
         self.client = openai_client()
-        self.max_tokens = max_tokens
+        self.deployment = deployment or self.settings.gen_deployment
+        self.params = model_params(self.deployment, max_tokens)
 
     def generate(self, question: str, passages: list[str]) -> Generation:
         start = time.perf_counter()
         r = self.client.chat.completions.create(
-            model=self.settings.gen_deployment,
+            model=self.deployment,
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": build_user_prompt(question, passages)},
             ],
-            temperature=0,
-            reasoning_effort="none",
-            max_completion_tokens=self.max_tokens,
+            **self.params,
         )
         return Generation(
             answer=(r.choices[0].message.content or "").strip(),

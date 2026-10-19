@@ -39,6 +39,22 @@ deployments:
     # Flex 処理（入力 1.00 / 出力 5.00）が使える（T04 で確認、service_tier="flex"）。
     # 即時性の要らない QA 生成と採点は Flex で呼ぶ
     flex_price: {input: 1.00, output: 5.00}
+  # ---- 生成モデルの差し替え比較（検索と Decision-1 の判定は最終評価のものを再利用し、回答だけ作り直す）----
+  - name: gen-nano
+    model: gpt-5-nano
+    format: OpenAI
+    version: "2025-08-07"
+    sku: GlobalStandard
+    capacity: 250
+    reasoning_effort: minimal  # gpt-5 系は none がないため最小の minimal。推論トークンは出力として課金される
+    price: {input: 0.05, output: 0.40}
+  - name: gen-phi
+    model: Phi-4-mini-instruct
+    format: Microsoft
+    version: "1"
+    sku: GlobalStandard
+    capacity: 20               # クォータ上限
+    price: {input: 0.075, output: 0.30}
 
 # 参考：不採用の候補（eastus2・GlobalStandard）
 #   gpt-5.4-mini  入力 0.75 / 出力 4.50（gen の代替）

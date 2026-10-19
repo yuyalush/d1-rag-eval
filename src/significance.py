@@ -36,6 +36,35 @@ def bootstrap_ci(diff: np.ndarray, n_boot: int = 10000, seed: int = 0) -> tuple[
     return float(np.percentile(means, 2.5)), float(np.percentile(means, 97.5))
 
 
+def compute(out_dir, split: str, baseline: str = "a_baseline") -> pd.DataFrame:
+    summarize(out_dir, split)  # per_question.csv を最新にする
+    df = pd.read_csv(out_dir / "per_question.csv")
+    df["abstained"] = df["abstained"].astype(float)
+
+    rows = []
+    for metric, answerable in METRICS:
+        sub = df if answerable is None else df[df.answerable == answerable]
+        per_q = sub.groupby(["config", "qid"])[metric].mean().unstack("config")
+        if baseline not in per_q:
+            continue
+        for cfg in per_q.columns:
+            if cfg == baseline:
+                continue
+            pair = per_q[[baseline, cfg]].dropna()
+            if pair.empty:
+                continue
+            diff = (pair[cfg] - pair[baseline]).to_numpy()
+            lo, hi = bootstrap_ci(diff)
+            label = metric if answerable is None else f"{metric}[{'answerable' if answerable else 'unanswerable'}]"
+            rows.append({
+                "metric": label, "config": cfg, "n": len(pair),
+                "baseline": round(pair[baseline].mean(), 4), "value": round(pair[cfg].mean(), 4),
+                "diff": round(diff.mean(), 4), "ci_low": round(lo, 4), "ci_high": round(hi, 4),
+                "significant": bool(lo > 0 or hi < 0),
+            })
+    return pd.DataFrame(rows)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--run-id", required=True)
@@ -44,32 +73,7 @@ def main() -> None:
     args = parser.parse_args()
 
     out_dir = RESULTS / args.run_id
-    summarize(out_dir, args.split)  # per_question.csv を最新にする
-    df = pd.read_csv(out_dir / "per_question.csv")
-    df["abstained"] = df["abstained"].astype(float)
-
-    rows = []
-    for metric, answerable in METRICS:
-        sub = df if answerable is None else df[df.answerable == answerable]
-        per_q = sub.groupby(["config", "qid"])[metric].mean().unstack("config")
-        if args.baseline not in per_q:
-            continue
-        for cfg in per_q.columns:
-            if cfg == args.baseline:
-                continue
-            pair = per_q[[args.baseline, cfg]].dropna()
-            if pair.empty:
-                continue
-            diff = (pair[cfg] - pair[args.baseline]).to_numpy()
-            lo, hi = bootstrap_ci(diff)
-            label = metric if answerable is None else f"{metric}[{'answerable' if answerable else 'unanswerable'}]"
-            rows.append({
-                "metric": label, "config": cfg, "n": len(pair),
-                "baseline": round(pair[args.baseline].mean(), 4), "value": round(pair[cfg].mean(), 4),
-                "diff": round(diff.mean(), 4), "ci_low": round(lo, 4), "ci_high": round(hi, 4),
-                "significant": bool(lo > 0 or hi < 0),
-            })
-    result = pd.DataFrame(rows)
+    result = compute(out_dir, args.split, args.baseline)
     result.to_csv(out_dir / "significance.csv", index=False)
     (out_dir / "significance.md").write_text(result.to_markdown(index=False), encoding="utf-8")
     print(result.to_string(index=False))

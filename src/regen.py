@@ -7,6 +7,9 @@ LLM に渡したチャンク（passed_ids）から回答だけを作り直す。
 
     uv run python -m src.regen --source test-final --target test-final-nano --deployment gen-nano
     uv run python -m src.score --run-id test-final-nano --split test     # 以降は通常と同じ
+
+Phi-4-mini-instruct は 1 分あたり 2 万トークン（入力＋max_tokens で見積もられる）の上限があり、
+1 回約 2,200 トークンなので --rpm 7 程度に抑えないと 429 の再試行待ちで逆に遅くなる。
 """
 
 from __future__ import annotations
@@ -63,6 +66,7 @@ def main() -> None:
     parser.add_argument("--deployment", required=True, help="生成に使うデプロイ（config/models.yaml の name）")
     parser.add_argument("--rpm", type=float, default=200, help="1 分あたりのリクエスト上限")
     parser.add_argument("--workers", type=int, default=4)
+    parser.add_argument("--runs", type=int, nargs="*", help="作り直す実行回（省略時は全部）。例: --runs 1")
     args = parser.parse_args()
 
     src_dir, out_dir = RESULTS / args.source, RESULTS / args.target
@@ -74,6 +78,8 @@ def main() -> None:
 
     for log in sorted(src_dir.glob("*__r*.jsonl")):
         if log.name.startswith("scores__"):
+            continue
+        if args.runs and int(log.stem.split("__r")[1]) not in args.runs:
             continue
         dest = out_dir / log.name
         done = {json.loads(line)["qid"] for line in dest.read_text(encoding="utf-8").splitlines()} if dest.exists() else set()

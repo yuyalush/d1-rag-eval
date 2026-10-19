@@ -12,6 +12,7 @@ import pandas as pd
 from src.config import ROOT
 from src.evaluate import RESULTS, summarize
 from src.report import CONFIG_LABELS, TYPE_LABELS, fmt
+from src.abstain_check import load as load_abstain_check
 from src.significance import compute
 
 RUNS = {  # run_id: 生成モデル
@@ -84,6 +85,24 @@ def main() -> None:
                 cells.append(f"{r['diff']:+.3f}{' ○' if r.significant else ''}")
             lines.append(f"| {model} | {fmt(base)} | " + " | ".join(cells) + " |")
         lines.append("")
+
+    # ---- 回答不能な質問での作り話（src.abstain_check の判定） ----
+    lines += ["## 回答不能な質問での作り話", "",
+              "控え率は回答が「わかりません」で始まるかで数えるので、「…は記載されていません。したがって、わかりません。」"
+              "のような書き方は控えに入らない。そうした回答を judge で「作り話（具体的な答えを断定）」と「意味上の控え」に分けた。"
+              "値は回答不能な質問への回答（22 問 × 3 回 = 66 件）のうち作り話の件数。", "",
+              "| 生成モデル | " + " | ".join(CONFIG_LABELS.values()) + " |", "| --- |" + " --- |" * len(CONFIG_LABELS)]
+    for run_id, model in RUNS.items():
+        if model not in summaries:
+            continue
+        checks = load_abstain_check(RESULTS / run_id)
+        cells = []
+        for cfg in CONFIG_LABELS:
+            fab = sum(1 for k, d in checks.items() if k.startswith(f"{cfg}__") and d["label"] == "fabricated")
+            dec = sum(1 for k, d in checks.items() if k.startswith(f"{cfg}__") and d["label"] == "declined")
+            cells.append(f"{fab}" + (f"（書き方のずれ {dec}）" if dec else ""))
+        lines.append(f"| {model} | " + " | ".join(cells) + " |")
+    lines.append("")
 
     out = ROOT / "docs/gen_compare.md"
     out.write_text("\n".join(lines) + "\n", encoding="utf-8")

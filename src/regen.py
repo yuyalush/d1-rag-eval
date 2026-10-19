@@ -66,6 +66,7 @@ def main() -> None:
     parser.add_argument("--deployment", required=True, help="生成に使うデプロイ（config/models.yaml の name）")
     parser.add_argument("--rpm", type=float, default=200, help="1 分あたりのリクエスト上限")
     parser.add_argument("--workers", type=int, default=4)
+    parser.add_argument("--timeout", type=float, default=60, help="1 リクエストのタイムアウト秒（Phi はときどき応答が止まるので短くして再試行する）")
     parser.add_argument("--runs", type=int, nargs="*", help="作り直す実行回（省略時は全部）。例: --runs 1")
     args = parser.parse_args()
 
@@ -73,6 +74,7 @@ def main() -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     chunks = {d["id"]: d["text"] for d in map(json.loads, (ROOT / "data/chunks.jsonl").read_text(encoding="utf-8").splitlines())}
     gen = Generator(deployment=args.deployment)
+    gen.client = gen.client.with_options(timeout=args.timeout, max_retries=10)
     limiter = Limiter(args.rpm)
     print(f"生成: {args.deployment}  パラメーター: {gen.params}")
 

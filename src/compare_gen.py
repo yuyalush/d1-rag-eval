@@ -7,6 +7,8 @@
 
 from __future__ import annotations
 
+import json
+
 import pandas as pd
 
 from src.config import ROOT
@@ -101,6 +103,30 @@ def main() -> None:
             fab = sum(1 for k, d in checks.items() if k.startswith(f"{cfg}__") and d["label"] == "fabricated")
             dec = sum(1 for k, d in checks.items() if k.startswith(f"{cfg}__") and d["label"] == "declined")
             cells.append(f"{fab}" + (f"（書き方のずれ {dec}）" if dec else ""))
+        lines.append(f"| {model} | " + " | ".join(cells) + " |")
+    lines.append("")
+
+    # ---- 出力上限（max_tokens）に達した回答 ----
+    lines += ["## 出力上限に達した回答", "",
+              "Phi-4-mini-instruct は、同じ入力・temperature 0 でも実行ごとに出力が変わり、ときどき意味のない文字列や同じ語の繰り返しが"
+              "上限の 800 トークンまで続いた。上限に達した回答の件数（288 件中）と、それを除いた正答率（参考値）を示す。作り直しはしていない。", "",
+              "| 生成モデル | " + " | ".join(CONFIG_LABELS.values()) + " |", "| --- |" + " --- |" * len(CONFIG_LABELS)]
+    for run_id, model in RUNS.items():
+        if model not in summaries:
+            continue
+        out_dir = RESULTS / run_id
+        per_q = pd.read_csv(out_dir / "per_question.csv")
+        capped = set()
+        for log in out_dir.glob("[a-e]_*__r*.jsonl"):
+            cfg, run = log.stem.split("__r")
+            for r in map(json.loads, log.read_text(encoding="utf-8").splitlines()):
+                if r["tokens"].get("gen_out", 0) >= 800:
+                    capped.add((cfg, int(run), r["qid"]))
+        per_q["capped"] = [(c, r, q) in capped for c, r, q in zip(per_q.config, per_q.run, per_q.qid)]
+        cells = []
+        for cfg in CONFIG_LABELS:
+            sub = per_q[per_q.config == cfg]
+            cells.append(f"{int(sub.capped.sum())}（除外後 {fmt(sub[~sub.capped].accuracy.mean())}）")
         lines.append(f"| {model} | " + " | ".join(cells) + " |")
     lines.append("")
 

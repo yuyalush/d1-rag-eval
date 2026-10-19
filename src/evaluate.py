@@ -107,6 +107,12 @@ def d1_auc(out_dir: Path, qa: dict[str, dict]) -> dict[str, float | None]:
     return out
 
 
+def api_latency(lat: dict[str, float]) -> float:
+    """レート制限の待ちを除いた時間：判定段を判定 API の応答時間（並列の最大値）に置き換える。"""
+    api = lat.get("judge_api_max", lat.get("d1_api_max"))  # d1_api_max は旧ログの名前
+    return lat["total"] - lat["judge"] + api if api is not None else lat["total"]
+
+
 def summarize(out_dir: Path, split: str) -> pd.DataFrame:
     qa = {q["qid"]: q for q in load_qa(split)}
     p = prices()
@@ -132,8 +138,7 @@ def summarize(out_dir: Path, split: str) -> pd.DataFrame:
                 "abstained": res["abstained"],
                 "latency_ms": res["latency_ms"]["total"],
                 # レート制限の待ちを除いた時間：判定段を Decision-1 API の応答時間（並列の最大値）に置き換える
-                "latency_api_ms": res["latency_ms"]["total"] - res["latency_ms"]["judge"] + res["latency_ms"]["d1_api_max"]
-                if "d1_api_max" in res["latency_ms"] else res["latency_ms"]["total"],
+                "latency_api_ms": api_latency(res["latency_ms"]),
                 "cost_usd": cost_usd(res["tokens"], p),
                 "accuracy": GRADE_POINTS.get(s["grade"]) if s else None,
                 "faithfulness": s.get("faithfulness") if s else None,

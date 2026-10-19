@@ -5,17 +5,20 @@ from __future__ import annotations
 import asyncio
 import json
 
+import time
+
 from src.clients import openai_client
 from src.config import load_settings
+from src.decision import RateLimiter
 from src.pipelines.base import Pipeline, PipelineResult
 from src.retriever import Hit
 
 
 def record_api_latency(result: PipelineResult, rs: list) -> None:
-    """レート制限の待ちを除いた Decision-1 の API 応答時間。並列呼び出しなので最大値が判定段の下限になる。"""
+    """レート制限の待ちを除いた判定 API の応答時間。並列呼び出しなので最大値が判定段の下限になる。"""
     lat = [r.latency_ms for r in rs]
-    result.latency_ms["d1_api_max"] = result.latency_ms.get("d1_api_max", 0.0) + max(lat)
-    result.latency_ms["d1_api_sum"] = result.latency_ms.get("d1_api_sum", 0.0) + sum(lat)
+    result.latency_ms["judge_api_max"] = result.latency_ms.get("judge_api_max", 0.0) + max(lat)
+    result.latency_ms["judge_api_sum"] = result.latency_ms.get("judge_api_sum", 0.0) + sum(lat)
     result.decision["d1_retries"] = result.decision.get("d1_retries", 0) + sum(r.retries for r in rs)
 
 
@@ -91,12 +94,15 @@ class ELLMFilter(Pipeline):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.client = openai_client()
+        # 429 が続いても落ちないよう再試行を多めにする（上限は gen デプロイの 1 分あたりのリクエスト数）
+        self.client = openai_client().with_options(max_retries=10)
         self.deployment = load_settings().gen_deployment
         self.prompt = self.cfg["llm_filter_prompt"]
         self.semaphore = asyncio.Semaphore(self.cfg["common"]["llm_filter_concurrency"])
+        self.limiter = RateLimiter(self.cfg["common"]["llm_filter_rpm"])
 
-    def _ask(self, question: str, passage: str) -> tuple[bool, int, int]:
+    def _ask(self, question: str, passage: str) -> tuple[bool, int, int, float]:
+        start = time.perf_counter()
         r = self.client.chat.completions.create(
             model=self.deployment,
             messages=[{"role": "user", "content": self.prompt.format(question=question, passage=passage)}],
@@ -109,19 +115,23 @@ class ELLMFilter(Pipeline):
             relevant = bool(json.loads(r.choices[0].message.content or "{}").get("relevant", False))
         except json.JSONDecodeError:
             relevant = False
-        return relevant, r.usage.prompt_tokens, r.usage.completion_tokens
+        return relevant, r.usage.prompt_tokens, r.usage.completion_tokens, (time.perf_counter() - start) * 1000
 
     async def judge(self, question: str, hits: list[Hit], result: PipelineResult) -> list[Hit]:
         async def one(h: Hit):
             async with self.semaphore:
+                await self.limiter.wait()
                 return await asyncio.to_thread(self._ask, question, h.content)
 
         rs = await asyncio.gather(*(one(h) for h in hits))
-        result.decision["llm_relevant"] = {h.id: rel for h, (rel, _, _) in zip(hits, rs)}
+        result.decision["llm_relevant"] = {h.id: rel for h, (rel, _, _, _) in zip(hits, rs)}
         result.tokens["filter_in"] = sum(r[1] for r in rs)
         result.tokens["filter_out"] = sum(r[2] for r in rs)
+        # レート制限の待ちを除いた API 応答時間（SDK 内の再試行の待ちは含まれる）
+        result.latency_ms["judge_api_max"] = max(r[3] for r in rs)
+        result.latency_ms["judge_api_sum"] = sum(r[3] for r in rs)
         # LLM は確率を返さないので、関連ありのものを検索順に最大 5 件
-        return [h for h, (rel, _, _) in zip(hits, rs) if rel][: self.max_chunks]
+        return [h for h, (rel, _, _, _) in zip(hits, rs) if rel][: self.max_chunks]
 
 
 PIPELINES: dict[str, type[Pipeline]] = {p.name: p for p in (ABaseline, BD1Filter, CD1Gate, DD1Rerank, ELLMFilter)}

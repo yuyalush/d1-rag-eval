@@ -25,7 +25,7 @@ deployments:
     format: OpenAI
     version: "2026-09-22"
     sku: GlobalStandard
-    capacity: 100
+    capacity: 250           # = 1 分あたり 250 リクエスト・25 万トークン（クォータ上限）。構成 E は 1 問 11 回呼ぶ
     reasoning_effort: none
     price: {input: 0.10, output: 0.50}
   - name: judge
@@ -33,7 +33,7 @@ deployments:
     format: OpenAI
     version: "2026-09-22"
     sku: GlobalStandard
-    capacity: 100
+    capacity: 250           # = 1 分あたり 250 リクエスト（クォータ上限）
     reasoning_effort: none
     price: {input: 2.00, output: 10.00}
     # Flex 処理（入力 1.00 / 出力 5.00）が使える（T04 で確認、service_tier="flex"）。

@@ -4,6 +4,7 @@ common:
   decision_concurrency: 4
   decision_rpm: 55            # Decision-1 のデプロイ上限（60 リクエスト/分）より少し下に抑える
   llm_filter_concurrency: 4
+  llm_filter_rpm: 200         # gen デプロイの上限（250 リクエスト/分）から回答生成の分を残す
 
 configs:
   a_baseline:

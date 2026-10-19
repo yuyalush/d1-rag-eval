@@ -98,6 +98,19 @@ def main() -> None:
                          f"{r['diff']:+.3f} | [{r.ci_low:+.3f}, {r.ci_high:+.3f}] | {'○' if r.significant else ''} |")
         lines += ["", "質問ごとに実行回の平均を取り、同じ質問どうしの差を 10,000 回再標本化した。信頼区間が 0 をまたがなければ有意（○）。", ""]
 
+    # ---- B と E の直接比較（Decision-1 と汎用 LLM の同じ判定） ----
+    vs_e = out_dir / "significance_vs_e.csv"
+    if vs_e.exists():
+        e = pd.read_csv(vs_e)
+        e = e[e.config == "b_d1_filter"]
+        lines += ["## 構成 B（Decision-1）と構成 E（汎用 LLM）の比較", "",
+                  "同じ判定文で、判定するモデルだけが異なる。差は B − E。", "",
+                  "| 指標 | E | B | 差 | 95% 信頼区間 | 有意 |", "| --- | --- | --- | --- | --- | --- |"]
+        for _, r in e.iterrows():
+            lines.append(f"| {r.metric} | {fmt(r.baseline)} | {fmt(r.value)} | {r['diff']:+.3f} | "
+                         f"[{r.ci_low:+.3f}, {r.ci_high:+.3f}] | {'○' if r.significant else ''} |")
+        lines.append("")
+
     # ---- 失敗例：D1 が根拠チャンクを除外 ----
     lines += [f"## 失敗例：Decision-1 が根拠チャンクを除外した例（構成 B、閾値 {threshold}）", ""]
     b_logs = [r for r in load_logs(out_dir, "b_d1_filter") if r["run"] == runs[0]]

@@ -318,7 +318,8 @@ def search_vector(q: dict) -> None:
             _retriever = Retriever()
         hits = _retriever.search(q["question"], 10).hits
     except Exception as e:  # Azure に接続できないときもツール自体は使えるようにする
-        input(color(f"検索できませんでした: {type(e).__name__}: {e}（Enter で戻る）", "31"))
+        print(color(f"検索できませんでした: {type(e).__name__}: {e}", "31"))
+        input("Enter で戻る> ")
         return
     gold = set(q["evidence_chunk_ids"])
     lines = [f"質問: {q['question']}\n"]
@@ -418,7 +419,10 @@ def run(only: str, start: str | None) -> None:
             print(message)
             message = ""
         try:
-            raw = input(bold(f"{q['qid']}> ")).strip()
+            # input() のプロンプトに色の制御コードを入れると、readline が解釈せずに
+            # 「[1m」のように表示される端末があるため、プロンプトは装飾なしにする
+            print(dim("─" * 40 + "  Enter: AI の提案を採用 / o・f・d: 判定 / v: 全文 / ?: ヘルプ"))
+            raw = input(f"{q['qid']}> ").strip()
         except (EOFError, KeyboardInterrupt):
             print()
             break

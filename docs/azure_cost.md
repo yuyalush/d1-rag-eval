@@ -2,7 +2,7 @@
 
 確定額は Cost Management Query API（ActualCost、請求通貨 JPY）、トークン数は Azure Monitor メトリックから `scripts/cost_report.py` で取得した。日付は UTC。
 
-**確定額 929.3 JPY ＋ 未反映分の見積もり 744.5 JPY ＝ 約 1,674 JPY**
+**確定額 1,664.8 JPY ＋ 未反映分の見積もり 3.3 JPY ＝ 約 1,668 JPY**
 
 為替レートは Decision-1 の確定額から逆算した 1 USD ≒ 157.5 JPY。
 
@@ -20,9 +20,9 @@
 | 2026-10-16 | gen | 545,599 | 13,571 | 10.5 | 0.0 |
 | 2026-10-19 | gen | 3,294,296 | 89,897 | 60.9 | 0.7 |
 | 2026-10-19 | gen-nano | 1,599,513 | 87,745 | 14.3 | 0.0 |
-| 2026-10-19 | gen-phi | 1,448,660 | 387,880 | 5.9 | 29.5 |
+| 2026-10-19 | gen-phi | 1,449,587 | 387,880 | 35.5 | 0.0 |
 | 2026-10-16 | judge | 372,065 | 29,068 | 89.3 | 0.2 |
-| 2026-10-19 | judge | 5,529,031 | 651,584 | 701.1 | 714.0 |
+| 2026-10-19 | judge | 5,530,384 | 651,622 | 1,407.0 | 2.4 |
 
 ## 3 つの方法の比較（確定額が出ている日）
 
@@ -38,9 +38,9 @@
 | 2026-10-16 | gen | +0 | 9.66 | 10.50 | +8.7% | 0.224（9） | 0.021 |
 | 2026-10-19 | gen | -36,440 | 58.98 | 60.86 | +3.2% | 0.842（42） | 0.014 |
 | 2026-10-19 | gen-nano | +7,529 | 18.13 | 14.29 | -21.2% | 0.017（3） | 0.001 |
-| 2026-10-19 | gen-phi | -1,489,925 | 35.45 | 5.91 | -83.3% | 0.000（0） | 0.000 |
+| 2026-10-19 | gen-phi | +2,856 | 35.46 | 35.53 | +0.2% | 0.000（0） | 0.000 |
 | 2026-10-16 | judge | -674 | 81.52 | 89.26 | +9.5% | 2.240（5） | 0.025 |
-| 2026-10-19 | judge | -2,916,582 | 1,384.38 | 701.15 | -49.4% | 4.952（19） | 0.007 |
+| 2026-10-19 | judge | -10,935 | 1,384.63 | 1,407.01 | +1.6% | 4.952（19） | 0.004 |
 
 ## 確定分の実効単価
 
@@ -52,8 +52,8 @@
 | embed | 3.15 | — | 3.15 | — |
 | gen | 16.64 | 78.78 | 15.75 | 78.77 |
 | gen-nano | 5.44 | 63.02 | 7.88 | 63.02 |
-| gen-phi | 11.82 | 47.26 | 11.82 | 47.26 |
-| judge | 164.09 | 787.94 | 157.55 | 787.75 |
+| gen-phi | 11.82 | 47.27 | 11.82 | 47.26 |
+| judge | 163.09 | 787.83 | 157.55 | 787.75 |
 
 ## メーター別（確定分の期間合計）
 
@@ -68,11 +68,11 @@
 | gen-nano | 入力 | GPT 5 Nano Inpt Glbl 1M Tokens | 1,055,298 | 8.31 |
 | gen-nano | 出力 | GPT 5 Nano outpt Glbl 1M Tokens | 87,937 | 5.54 |
 | gen-nano | キャッシュ読み取り | GPT 5 Nano cchd Inpt Glbl 1M Tokens | 551,552 | 0.43 |
-| gen-phi | 入力 | Phi-4-Mini-Input Tokens | 295,488 | 3.49 |
-| gen-phi | 出力 | Phi-4-Mini-Output Tokens | 51,127 | 2.42 |
-| judge | キャッシュ書き込み（Flex） | 6-sol ShortCo Cd Wr Flex Gl 1M Tokens | 1,834,431 | 361.27 |
-| judge | 出力（Flex） | 6-sol ShortCo Opt Flex Gl 1M Tokens | 303,041 | 238.72 |
-| judge | 入力（Flex） | 6-sol ShortCo Inp Flex Gl 1M Tokens | 1,172,053 | 184.66 |
-| judge | キャッシュ読み取り（Flex） | 6-sol ShortCo Cd Inp Flex Gl 1M Tokens | 354,710 | 5.59 |
+| gen-phi | 出力 | Phi-4-Mini-Output Tokens | 388,808 | 18.38 |
+| gen-phi | 入力 | Phi-4-Mini-Input Tokens | 1,451,515 | 17.15 |
+| judge | キャッシュ書き込み（Flex） | 6-sol ShortCo Cd Wr Flex Gl 1M Tokens | 3,182,653 | 626.78 |
+| judge | 出力（Flex） | 6-sol ShortCo Opt Flex Gl 1M Tokens | 679,460 | 535.24 |
+| judge | 入力（Flex） | 6-sol ShortCo Inp Flex Gl 1M Tokens | 2,054,975 | 323.76 |
+| judge | キャッシュ読み取り（Flex） | 6-sol ShortCo Cd Inp Flex Gl 1M Tokens | 654,185 | 10.31 |
 | judge | 出力 | 6-sol ShortCo Opt Std Gl 1M Tokens | 73 | 0.12 |
 | judge | 入力 | 6-sol ShortCo Inp Std Gl 1M Tokens | 184 | 0.06 |

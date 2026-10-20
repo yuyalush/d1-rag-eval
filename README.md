@@ -128,7 +128,7 @@ db/                 pgvector のスキーマ
 config.yaml         構成ごとの検索件数、閾値、Decision-1 の質問文、レート制限
 config/models.yaml  モデル・バージョン・SKU・容量・単価・確認日
 src/                チャンク化、取り込み、検索・判定・生成、構成 A〜E（pipelines/）、評価・採点・有意差・レポート
-scripts/            記事の取得、疎通確認、質問セットのレビュー、使用料の取得
+scripts/            記事の取得、疎通確認、質問セットのレビュー、使用料の取得（説明は scripts/README.md）
 data/qa/            質問セット（dev.jsonl / test.jsonl）とレビュー記録
 docs/               結果の表（最終評価、チューニング、生成モデル比較、使用料）
 tests/              単体テスト

@@ -6,7 +6,7 @@ data/raw/<service>__<slug>.md に保存する。取得済みの記事は飛ば�
 
 元記事は MicrosoftDocs/azure-docs（CC BY 4.0）。日本語版は機械翻訳（ms.translationtype: MT）が中心。
 
-    uv run python -m scripts.fetch_corpus --max-docs 200
+    uv run python -m scripts.fetch_corpus --max-docs 400   # 全件（302 記事）。既定の 200 では途中まで
 """
 
 from __future__ import annotations

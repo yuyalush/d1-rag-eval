@@ -1,4 +1,4 @@
-# Azure の使用料（rg-d1rag-eval、2026-10-16〜2026-10-20）
+# Azure の使用料（rg-d1rag-eval、2026-10-16〜2026-10-21）
 
 確定額は Cost Management Query API（ActualCost、請求通貨 JPY）、トークン数は Azure Monitor メトリックから `scripts/cost_report.py` で取得した。日付は UTC。
 

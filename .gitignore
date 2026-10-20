@@ -11,6 +11,8 @@ __pycache__/
 data/raw/*
 !data/raw/.gitkeep
 data/chunks.jsonl
+# レビュー用 CSV は Microsoft Learn のチャンク本文を含むため追跡しない（scripts/review_sheet.py・ai_review.py で手元に再生成できる）
+data/qa/*.csv
 results/*
 !results/.gitkeep
 

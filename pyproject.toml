@@ -1,6 +1,7 @@
 [project]
 name = "d1-rag-eval"
 version = "0.1.0"
+license = "MIT"
 description = "Microsoft-Decision-1 を RAG に組み込んだ場合の効果を検証する評価リポジトリ"
 readme = "README.md"
 requires-python = ">=3.11"

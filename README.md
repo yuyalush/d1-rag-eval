@@ -157,4 +157,11 @@ Microsoft、Azure、Microsoft Learn は Microsoft グループの商標です。
 
 ## ライセンス
 
-このリポジトリのコード、質問セット、ドキュメントは [クリエイティブ・コモンズ 表示 4.0 国際（CC BY 4.0）](https://creativecommons.org/licenses/by/4.0/deed.ja) で提供します（全文は [`LICENSE`](LICENSE)）。質問セットなど Microsoft Learn を元にした部分は、上の「出典」の表示もあわせて行ってください。
+対象によってライセンスを分けています。
+
+| 対象 | ライセンス |
+| --- | --- |
+| コード（`src/`、`scripts/`、`infra/`、`tests/`、`db/`、設定ファイルなど） | [MIT License](LICENSE) |
+| ドキュメントと結果の表（`README.md`、`docs/`）、質問セット（`data/qa/`） | [クリエイティブ・コモンズ 表示 4.0 国際（CC BY 4.0）](https://creativecommons.org/licenses/by/4.0/deed.ja)（全文は [`LICENSE-CC-BY-4.0`](LICENSE-CC-BY-4.0)） |
+
+質問セットなど Microsoft Learn を元にした部分を使う場合は、上の「出典」の表示もあわせて行ってください。
